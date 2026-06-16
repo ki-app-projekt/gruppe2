@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Wasserpistolen-Spiel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0b6ff2;
+      font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      color: white;
+      font-size: 15px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      user-select: none;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #status {
+      max-width: 70%;
+    }
+
+    #leaderboard {
+      text-align: right;
+      white-space: pre-line;
+    }
+
+    #msg {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 28px;
+      font-weight: bold;
+      text-align: center;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+      pointer-events: none;
+      padding: 20px;
+      white-space: pre-line;
+      z-index: 5;
+    }
+
+    #shop,
+    #resultScreen,
+    #adminPanel {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+
+    #shop {
+      background: rgba(0,0,0,0.55);
+      z-index: 10;
+    }
+
+    #resultScreen {
+      background: rgba(0,0,0,0.68);
+      z-index: 20;
+    }
+
+    #adminPanel {
+      background: rgba(0,0,0,0.72);
+      z-index: 40;
+    }
+
+    #shopBox,
+    #resultBox,
+    #adminBox {
+      width: min(560px, 92vw);
+      max-height: 88vh;
+      overflow-y: auto;
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.45);
+    }
+
+    #shopBox,
+    #resultBox {
+      background: #063b8f;
+      border: 3px solid white;
+    }
+
+    #adminBox {
+      background: #111b44;
+      border: 3px solid #ffcc00;
+    }
+
+    h2 {
+      margin-top: 0;
+      text-align: center;
+    }
+
+    #shopCoins {
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .shopItem {
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 14px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+
+    .shopItem strong {
+      font-size: 18px;
+    }
+
+    .shopItem p {
+      margin: 8px 0;
+      line-height: 1.4;
+    }
+
+    button {
+      margin-top: 8px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      background: #ffcc00;
+      color: #222;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #888;
+      color: #ddd;
+      cursor: not-allowed;
+    }
+
+    #closeShop,
+    #adminClose {
+      width: 100%;
+      background: #ff3b5c;
+      color: white;
+      font-size: 16px;
+    }
+
+    #continueToShop {
+      width: 100%;
+      font-size: 18px;
+      padding: 12px;
+    }
+
+    #resultRank {
+      font-size: 23px;
+      font-weight: bold;
+      margin: 12px 0;
+      color: #ffcc00;
+      text-align: center;
+    }
+
+    #resultLeaderboard {
+      white-space: pre-line;
+      background: rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 12px 0;
+      text-align: left;
+      line-height: 1.45;
+    }
+
+    #adminBox h2 {
+      color: #ffcc00;
+    }
+
+    #adminBox label {
+      display: block;
+      margin: 12px 0;
+      font-weight: bold;
+    }
+
+    #adminBox input {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 6px;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+
+    #adminBox button {
+      width: 100%;
+    }
+
+    #adminUnlockWeapons {
+      background: #00e676;
+    }
+
+    #adminLoginMsg {
+      color: #ffcc00;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    #adminControls {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="ui">
+    <div id="status">Lädt...</div>
+    <div id="leaderboard">Rangliste</div>
+  </div>
+
+  <div id="msg"></div>
+
+  <div id="resultScreen">
+    <div id="resultBox">
+      <h2>Game Over</h2>
+      <div id="resultRank"></div>
+      <div id="resultLeaderboard"></div>
+      <button id="continueToShop">Weiter zum Shop</button>
+    </div>
+  </div>
+
+  <div id="shop">
+    <div id="shopBox">
+      <h2>Waffen-Shop</h2>
+      <p id="shopCoins">Münzen: 0</p>
+      <div id="shopItems"></div>
+      <button id="closeShop">Shop schließen</button>
+    </div>
+  </div>
+
+  <div id="adminPanel">
+    <div id="adminBox">
+      <h2>Admin-Panel</h2>
+
+      <div id="adminLogin">
+        <p>Admin-Code eingeben:</p>
+        <input id="adminCodeInput" type="password" placeholder="Admin-Code" />
+        <button id="adminLoginBtn">Einloggen</button>
+        <p id="adminLoginMsg"></p>
+      </div>
+
+      <div id="adminControls">
+        <p><strong>Admin aktiv</strong></p>
+
+        <label>
+          Zielscheiben-Grundgeschwindigkeit:
+          <input id="adminTargetSpeed" type="number" min="20" max="1000" />
+        </label>
+
+        <label>
+          Geschwindigkeit pro Level:
+          <input id="adminSpeedPerLevel" type="number" min="0" max="300" />
+        </label>
+
+        <label>
+          Trophäen pro Zielscheibe:
+          <input id="adminTrophiesPerTarget" type="number" min="0" max="1000" />
+        </label>
+
+        <button id="adminSaveSettings">Einstellungen speichern</button>
+        <button id="adminUnlockWeapons">Alle Waffen kostenlos freischalten</button>
+        <button id="adminClose">Admin-Panel schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const statusEl = document.getElementById("status");
+    const leaderboardEl = document.getElementById("leaderboard");
+    const msgEl = document.getElementById("msg");
+
+    const shopEl = document.getElementById("shop");
+    const shopItemsEl = document.getElementById("shopItems");
+    const shopCoinsEl = document.getElementById("shopCoins");
+    const closeShopBtn = document.getElementById("closeShop");
+
+    const resultScreenEl = document.getElementById("resultScreen");
+    const resultRankEl = document.getElementById("resultRank");
+    const resultLeaderboardEl = document.getElementById("resultLeaderboard");
+    const continueToShopBtn = document.getElementById("continueToShop");
+
+    const adminPanelEl = document.getElementById("adminPanel");
+    const adminLoginEl = document.getElementById("adminLogin");
+    const adminControlsEl = document.getElementById("adminControls");
+    const adminCodeInputEl = document.getElementById("adminCodeInput");
+    const adminLoginBtn = document.getElementById("adminLoginBtn");
+    const adminLoginMsgEl = document.getElementById("adminLoginMsg");
+
+    const adminTargetSpeedEl = document.getElementById("adminTargetSpeed");
+    const adminSpeedPerLevelEl = document.getElementById("adminSpeedPerLevel");
+    const adminTrophiesPerTargetEl = document.getElementById("adminTrophiesPerTarget");
+
+    const adminSaveSettingsBtn = document.getElementById("adminSaveSettings");
+    const adminUnlockWeaponsBtn = document.getElementById("adminUnlockWeapons");
+    const adminCloseBtn = document.getElementById("adminClose");
+
+    const ADMIN_CODE = "Fcb";
+
+    const GUN_URL = "https://images.thalia.media/-/BF750-750/c68cb37026b94d3c9f60ed3bc370277b/splash-fun-wasserpistole-21-cm-elektrisch.jpeg";
+
+    const gunImg = new Image();
+    let gunLoaded = false;
+
+    gunImg.onload = () => {
+      gunLoaded = true;
+    };
+
+    gunImg.onerror = () => {
+      gunLoaded = false;
+    };
+
+    gunImg.src = GUN_URL;
+
+    const weapons = [
+      {
+        id: "basic",
+        name: "Starter-Wasserpistole",
+        price: 0,
+        bulletRadius: 22,
+        bulletSpeed: 760,
+        cooldown: 0.16,
+        color: "rgba(120,230,255,0.85)"
+      },
+      {
+        id: "pistol1",
+        name: "Turbo-Pistole",
+        price: 500,
+        bulletRadius: 18,
+        bulletSpeed: 950,
+        cooldown: 0.11,
+        color: "rgba(0,255,180,0.9)"
+      },
+      {
+        id: "pistol2",
+        name: "Mega-Spritzer",
+        price: 1000,
+        bulletRadius: 30,
+        bulletSpeed: 820,
+        cooldown: 0.17,
+        color: "rgba(80,200,255,0.95)"
+      },
+      {
+        id: "pistol3",
+        name: "Blauer Blitz",
+        price: 1500,
+        bulletRadius: 16,
+        bulletSpeed: 1200,
+        cooldown: 0.09,
+        color: "rgba(80,150,255,0.95)"
+      },
+      {
+        id: "pistol4",
+        name: "Gold-Pistole",
+        price: 2000,
+        bulletRadius: 25,
+        bulletSpeed: 1050,
+        cooldown: 0.10,
+        color: "rgba(255,215,0,0.95)"
+      },
+      {
+        id: "pistol5",
+        name: "Doppel-Spritzer",
+        price: 2500,
+        bulletRadius: 28,
+        bulletSpeed: 1000,
+        cooldown: 0.08,
+        color: "rgba(255,80,255,0.95)"
+      },
+      {
+        id: "pistol6",
+        name: "Eis-Wasserpistole",
+        price: 3000,
+        bulletRadius: 24,
+        bulletSpeed: 1150,
+        cooldown: 0.085,
+        color: "rgba(180,240,255,0.95)"
+      },
+      {
+        id: "pistol7",
+        name: "Feuer-Wasserpistole",
+        price: 3500,
+        bulletRadius: 32,
+        bulletSpeed: 980,
+        cooldown: 0.095,
+        color: "rgba(255,120,40,0.95)"
+      },
+      {
+        id: "pistol8",
+        name: "Regenbogen-Pistole",
+        price: 4000,
+        bulletRadius: 30,
+        bulletSpeed: 1250,
+        cooldown: 0.075,
+        color: "rgba(255,90,255,0.98)"
+      },
+      {
+        id: "pistol9",
+        name: "Power-Kanone",
+        price: 4500,
+        bulletRadius: 40,
+        bulletSpeed: 900,
+        cooldown: 0.14,
+        color: "rgba(255,255,255,0.95)"
+      },
+      {
+        id: "pistol10",
+        name: "Ultra-Wasserpistole",
+        price: 10000,
+        bulletRadius: 36,
+        bulletSpeed: 1400,
+        cooldown: 0.06,
+        color: "rgba(0,255,255,0.98)"
+      }
+    ];
+
+    function loadOwnedWeapons() {
+      try {
+        return JSON.parse(localStorage.getItem("ownedWeapons")) || ["basic"];
+      } catch {
+        return ["basic"];
+      }
+    }
+
+    const player = {
+      x: 0,
+      y: 0,
+      drawW: 190,
+      drawH: 95,
+      speed: 380,
+      cooldown: 0,
+      left: false,
+      right: false
+    };
+
+    const state = {
+      level: 1,
+      maxLevel: 10,
+      lives: 5,
+      hits: 0,
+      requiredHits: 10,
+      timeLeft: 25,
+      lastT: performance.now(),
+      messageTimer: 0,
+      finished: false,
+
+      coins: Number(localStorage.getItem("coins") || 0),
+      trophies: Number(localStorage.getItem("trophies") || 0),
+      score: 0,
+      playerName: localStorage.getItem("playerName") || "Spieler",
+      isAdmin: false,
+
+      ownedWeapons: loadOwnedWeapons(),
+      equippedWeapon: localStorage.getItem("equippedWeapon") || "basic"
+    };
+
+    if (!state.ownedWeapons.includes("basic")) {
+      state.ownedWeapons.push("basic");
+    }
+
+    const config = {
+      levelTime: 25,
+      baseTargetSpeed: 120,
+      speedPerLevel: 38,
+      targetRadius: 52,
+      maxTargetsOnScreen: 5,
+      baseSpawnMs: 950,
+      spawnDecPerLevel: 60,
+      minSpawnMs: 340,
+      coinsPerLevel: 50,
+      coinsPerTarget: 10
+    };
+
+    const adminSettings = {
+      targetSpeed: Number(localStorage.getItem("adminTargetSpeed") || config.baseTargetSpeed),
+      speedPerLevel: Number(localStorage.getItem("adminSpeedPerLevel") || config.speedPerLevel),
+      trophiesPerTarget: Number(localStorage.getItem("adminTrophiesPerTarget") || 1)
+    };
+
+    const bullets = [];
+    const targets = [];
+    const explosions = [];
+
+    let spawnTimer = 0;
+    let scoreSaved = false;
+    let lastRank = null;
+
+    function resize() {
+      canvas.width = innerWidth;
+      canvas.height = innerHeight;
+
+      player.y = canvas.height - 75;
+      player.x = clamp(player.x || canvas.width / 2, 45, canvas.width - 45);
+
+      const base = Math.max(150, Math.min(240, canvas.width * 0.18));
+      player.drawW = base;
+      player.drawH = base * 0.52;
+    }
+
+    addEventListener("resize", resize, { passive: true });
+    resize();
+
+    addEventListener("pointermove", (e) => {
+      if (state.finished) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const px = (e.clientX - rect.left) * (canvas.width / rect.width);
+
+      player.x = clamp(px, 45, canvas.width - 45);
+    }, { passive: true });
+
+    addEventListener("pointerdown", () => {
+      if (shopEl.style.display === "flex") return;
+      if (resultScreenEl.style.display === "flex") return;
+      if (adminPanelEl.style.display === "flex") return;
+
+      shoot();
+    });
+
+    addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.shiftKey && e.code === "KeyA") {
+        openAdminPanel();
+        e.preventDefault();
+      }
+
+      if (e.code === "ArrowLeft") {
+        player.left = true;
+      }
+
+      if (e.code === "ArrowRight") {
+        player.right = true;
+      }
+
+      if (e.code === "Space") {
+        shoot();
+        e.preventDefault();
+      }
+
+      if (e.code === "KeyR") {
+        restartGame();
+      }
+
+      if (e.code === "KeyN") {
+        changeName();
+      }
+
+      if (e.code === "KeyS") {
+        toggleShop();
+      }
+    });
+
+    addEventListener("keyup", (e) => {
+      if (e.code === "ArrowLeft") {
+        player.left = false;
+      }
+
+      if (e.code === "ArrowRight") {
+        player.right = false;
+      }
+    });
+
+    let audioCtx = null;
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playSquirt() {
+      try {
+        ensureAudio();
+
+        const t0 = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(1500, t0);
+        osc.frequency.exponentialRampToValueAtTime(850, t0 + 0.08);
+
+        gain.gain.setValueAtTime(0.17, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.09);
+      } catch {}
+    }
+
+    function playHit() {
+      try {
+        ensureAudio();
+
+        const t0 = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(750, t0);
+        osc.frequency.exponentialRampToValueAtTime(430, t0 + 0.13);
+
+        gain.gain.setValueAtTime(0.25, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
+
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.14);
+      } catch {}
+    }
+
+    function getCurrentWeapon() {
+      return weapons.find(w => w.id === state.equippedWeapon) || weapons[0];
+    }
+
+    function saveWeapons() {
+      localStorage.setItem("ownedWeapons", JSON.stringify(state.ownedWeapons));
+      localStorage.setItem("equippedWeapon", state.equippedWeapon);
+    }
+
+    function toggleShop() {
+      if (shopEl.style.display === "flex") {
+        closeShop();
+      } else {
+        openShop();
+      }
+    }
+
+    function openShop() {
+      shopEl.style.display = "flex";
+      renderShop();
+    }
+
+    function closeShop() {
+      shopEl.style.display = "none";
+    }
+
+    function renderShop() {
+      shopCoinsEl.textContent = "Münzen: " + state.coins;
+      shopItemsEl.innerHTML = "";
+
+      for (const weapon of weapons) {
+        const owned = state.ownedWeapons.includes(weapon.id);
+        const equipped = state.equippedWeapon === weapon.id;
+
+        const item = document.createElement("div");
+        item.className = "shopItem";
+
+        const title = document.createElement("strong");
+        title.textContent = weapon.name;
+        item.appendChild(title);
+
+        const info = document.createElement("p");
+        info.innerHTML =
+          "Preis: " + weapon.price + " Münzen<br>" +
+          "Schussgröße: " + weapon.bulletRadius + "<br>" +
+          "Schussgeschwindigkeit: " + weapon.bulletSpeed + "<br>" +
+          "Schuss-Abklingzeit: " + weapon.cooldown + " s";
+        item.appendChild(info);
+
+        const button = document.createElement("button");
+
+        if (equipped) {
+          button.textContent = "Ausgerüstet";
+          button.disabled = true;
+        } else if (owned) {
+          button.textContent = "Ausrüsten";
+          button.onclick = () => {
+            state.equippedWeapon = weapon.id;
+            saveWeapons();
+            renderShop();
+            updateLeaderboard();
+          };
+        } else {
+          button.textContent = "Kaufen";
+          button.disabled = state.coins < weapon.price;
+
+          button.onclick = () => {
+            buyWeapon(weapon.id);
+          };
+        }
+
+        item.appendChild(button);
+        shopItemsEl.appendChild(item);
+      }
+    }
+
+    function buyWeapon(weaponId) {
+      const weapon = weapons.find(w => w.id === weaponId);
+
+      if (!weapon) return;
+      if (state.ownedWeapons.includes(weapon.id)) return;
+
+      if (state.coins >= weapon.price) {
+        state.coins -= weapon.price;
+        state.ownedWeapons.push(weapon.id);
+        state.equippedWeapon = weapon.id;
+
+        localStorage.setItem("coins", String(state.coins));
+        saveWeapons();
+
+        showMessage(weapon.name + "\ngekauft und ausgerüstet!", 1.5);
+        renderShop();
+        updateLeaderboard();
+      } else {
+        showMessage("Nicht genug Münzen!", 1.2);
+      }
+    }
+
+    function openAdminPanel() {
+      adminPanelEl.style.display = "flex";
+
+      if (state.isAdmin) {
+        showAdminControls();
+      } else {
+        adminLoginEl.style.display = "block";
+        adminControlsEl.style.display = "none";
+        adminCodeInputEl.value = "";
+        adminLoginMsgEl.textContent = "";
+      }
+    }
+
+    function closeAdminPanel() {
+      adminPanelEl.style.display = "none";
+    }
+
+    function showAdminControls() {
+      adminLoginEl.style.display = "none";
+      adminControlsEl.style.display = "block";
+
+      adminTargetSpeedEl.value = adminSettings.targetSpeed;
+      adminSpeedPerLevelEl.value = adminSettings.speedPerLevel;
+      adminTrophiesPerTargetEl.value = adminSettings.trophiesPerTarget;
+    }
+
+    function adminLogin() {
+      const code = adminCodeInputEl.value;
+
+      if (code === ADMIN_CODE) {
+        state.isAdmin = true;
+        adminLoginMsgEl.textContent = "Admin aktiviert!";
+        showAdminControls();
+      } else {
+        adminLoginMsgEl.textContent = "Falscher Admin-Code!";
+      }
+    }
+
+    function saveAdminSettings() {
+      if (!state.isAdmin) return;
+
+      adminSettings.targetSpeed = Number(adminTargetSpeedEl.value);
+      adminSettings.speedPerLevel = Number(adminSpeedPerLevelEl.value);
+      adminSettings.trophiesPerTarget = Number(adminTrophiesPerTargetEl.value);
+
+      localStorage.setItem("adminTargetSpeed", String(adminSettings.targetSpeed));
+      localStorage.setItem("adminSpeedPerLevel", String(adminSettings.speedPerLevel));
+      localStorage.setItem("adminTrophiesPerTarget", String(adminSettings.trophiesPerTarget));
+
+      showMessage("Admin-Einstellungen gespeichert!", 1.5);
+      updateLeaderboard();
+    }
+
+    function adminUnlockAllWeapons() {
+      if (!state.isAdmin) return;
+
+      state.ownedWeapons = weapons.map(weapon => weapon.id);
+      state.equippedWeapon = weapons[weapons.length - 1].id;
+
+      saveWeapons();
+      renderShop();
+      updateLeaderboard();
+
+      showMessage("Alle Waffen wurden kostenlos freigeschaltet!", 1.8);
+    }
+
+    closeShopBtn.onclick = closeShop;
+
+    continueToShopBtn.onclick = () => {
+      resultScreenEl.style.display = "none";
+      openShop();
+    };
+
+    adminLoginBtn.onclick = adminLogin;
+    adminSaveSettingsBtn.onclick = saveAdminSettings;
+    adminUnlockWeaponsBtn.onclick = adminUnlockAllWeapons;
+    adminCloseBtn.onclick = closeAdminPanel;
+
+    function shoot() {
+      if (state.finished) return;
+      if (shopEl.style.display === "flex") return;
+      if (resultScreenEl.style.display === "flex") return;
+      if (adminPanelEl.style.display === "flex") return;
+      if (player.cooldown > 0) return;
+
+      const weapon = getCurrentWeapon();
+
+      bullets.push({
+        x: player.x,
+        y: player.y - 45,
+        r: weapon.bulletRadius,
+        vy: -weapon.bulletSpeed,
+        color: weapon.color
+      });
+
+      player.cooldown = weapon.cooldown;
+      playSquirt();
+    }
+
+    function spawnTarget() {
+      if (targets.length >= config.maxTargetsOnScreen) return;
+
+      const r = config.targetRadius;
+
+      targets.push({
+        x: rand(r, canvas.width - r),
+        y: -r,
+        r,
+        vy: adminSettings.targetSpeed + state.level * adminSettings.speedPerLevel,
+        wobble: rand(0, Math.PI * 2),
+        color: randomColor()
+      });
+    }
+
+    function update(dt) {
+      if (state.finished) return;
+      if (shopEl.style.display === "flex") return;
+      if (resultScreenEl.style.display === "flex") return;
+      if (adminPanelEl.style.display === "flex") return;
+
+      state.timeLeft -= dt;
+
+      if (state.timeLeft <= 0) {
+        loseLife();
+      }
+
+      if (player.left) {
+        player.x -= player.speed * dt;
+      }
+
+      if (player.right) {
+        player.x += player.speed * dt;
+      }
+
+      player.x = clamp(player.x, 45, canvas.width - 45);
+      player.cooldown = Math.max(0, player.cooldown - dt);
+
+      const spawnMs = Math.max(
+        config.minSpawnMs,
+        config.baseSpawnMs - state.level * config.spawnDecPerLevel
+      );
+
+      spawnTimer += dt * 1000;
+
+      if (spawnTimer >= spawnMs) {
+        spawnTimer = 0;
+        spawnTarget();
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.y += b.vy * dt;
+
+        if (b.y < -80) {
+          bullets.splice(i, 1);
+        }
+      }
+
+      for (let i = targets.length - 1; i >= 0; i--) {
+        const t = targets[i];
+
+        t.wobble += dt * 4;
+        t.y += t.vy * dt;
+        t.x += Math.sin(t.wobble) * 45 * dt;
+
+        if (t.y - t.r > canvas.height) {
+          targets.splice(i, 1);
+          loseLife();
+        }
+      }
+
+      checkCollisions();
+
+      for (let i = explosions.length - 1; i >= 0; i--) {
+        explosions[i].time -= dt;
+
+        if (explosions[i].time <= 0) {
+          explosions.splice(i, 1);
+        }
+      }
+
+      if (state.messageTimer > 0) {
+        state.messageTimer -= dt;
+
+        if (state.messageTimer <= 0 && !state.finished) {
+          msgEl.style.display = "none";
+        }
+      }
+    }
+
+    function checkCollisions() {
+      for (let i = targets.length - 1; i >= 0; i--) {
+        const t = targets[i];
+
+        for (let j = bullets.length - 1; j >= 0; j--) {
+          const b = bullets[j];
+
+          const dx = t.x - b.x;
+          const dy = t.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < t.r + b.r) {
+            targets.splice(i, 1);
+            bullets.splice(j, 1);
+
+            state.hits++;
+            state.score += 10 * state.level;
+
+            // 10 Münzen pro abgeschossenes Ziel
+            state.coins += config.coinsPerTarget;
+            localStorage.setItem("coins", String(state.coins));
+
+            state.trophies += adminSettings.trophiesPerTarget;
+            localStorage.setItem("trophies", String(state.trophies));
+
+            explosions.push({
+              x: t.x,
+              y: t.y,
+              time: 0.35,
+              color: t.color
+            });
+
+            playHit();
+
+            if (state.hits >= state.requiredHits) {
+              completeLevel();
+            }
+
+            break;
+          }
+        }
+      }
+    }
+
+    function completeLevel() {
+      state.coins += config.coinsPerLevel;
+      state.score += config.coinsPerLevel;
+
+      localStorage.setItem("coins", String(state.coins));
+
+      bullets.length = 0;
+      targets.length = 0;
+
+      showMessage(
+        "Level " + state.level + " geschafft!\n+" + config.coinsPerLevel + " Münzen",
+        1.5
+      );
+
+      if (state.level >= state.maxLevel) {
+        winGame();
+        return;
+      }
+
+      state.level++;
+      state.hits = 0;
+      state.requiredHits = 10 + Math.floor(state.level / 2);
+      state.timeLeft = config.levelTime;
+    }
+
+    function loseLife() {
+      state.lives--;
+
+      bullets.length = 0;
+      targets.length = 0;
+      state.timeLeft = config.levelTime;
+
+      if (state.lives <= 0) {
+        gameOver();
+        return;
+      }
+
+      showMessage("Leben verloren!\nNoch " + state.lives + " Leben", 1.2);
+    }
+
+    function winGame() {
+      state.finished = true;
+      const rank = saveScore();
+
+      showMessage(
+        "Gewonnen!\nScore: " + state.score +
+        "\nDu bist auf Platz " + rank +
+        "\nMünzen: " + state.coins +
+        "\nTrophäen: " + state.trophies +
+        "\n\nR = Neustart\nS = Shop",
+        999
+      );
+    }
+
+    function gameOver() {
+      state.finished = true;
+
+      const rank = saveScore();
+
+      openResultScreen(rank);
+    }
+
+    function saveScore() {
+      if (scoreSaved) return lastRank;
+
+      scoreSaved = true;
+
+      const list = getLeaderboard();
+
+      const entry = {
+        id: Date.now() + "_" + Math.random(),
+        name: state.playerName,
+        score: state.score,
+        level: state.level,
+        coins: state.coins,
+        trophies: state.trophies
+      };
+
+      list.push(entry);
+
+      list.sort((a, b) => b.score - a.score);
+
+      lastRank = list.findIndex(item => item.id === entry.id) + 1;
+
+      const top10 = list.slice(0, 10);
+
+      localStorage.setItem("leaderboard", JSON.stringify(top10));
+      updateLeaderboard();
+
+      return lastRank;
+    }
+
+    function openResultScreen(rank) {
+      msgEl.style.display = "none";
+
+      const list = getLeaderboard();
+
+      resultRankEl.textContent = "Du bist auf Platz " + rank + "!";
+
+      let text = "Rangliste:\n\n";
+
+      if (list.length === 0) {
+        text += "Noch keine Einträge";
+      } else {
+        for (let i = 0; i < list.length; i++) {
+          text += (i + 1) + ". " + list[i].name + " - " + list[i].score + " Punkte\n";
+        }
+      }
+
+      text += "\nDein Score: " + state.score;
+      text += "\nDein erreichtes Level: " + state.level;
+      text += "\nDeine Münzen: " + state.coins;
+      text += "\nDeine Trophäen: " + state.trophies;
+      text += "\n\nKlicke auf Weiter, um zum Shop zu gehen.";
+
+      resultLeaderboardEl.textContent = text;
+
+      resultScreenEl.style.display = "flex";
+    }
+
+    function getLeaderboard() {
+      try {
+        return JSON.parse(localStorage.getItem("leaderboard")) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function updateLeaderboard() {
+      const list = getLeaderboard();
+
+      let text = "";
+      text += "Spieler: " + state.playerName + "\n";
+      text += "Münzen: " + state.coins + "\n";
+      text += "Trophäen: " + state.trophies + "\n";
+      text += "Waffe: " + getCurrentWeapon().name + "\n\n";
+      text += "Rangliste:\n";
+
+      if (list.length === 0) {
+        text += "Noch keine Einträge\n";
+      } else {
+        for (let i = 0; i < list.length; i++) {
+          text += (i + 1) + ". " + list[i].name + " - " + list[i].score + "\n";
+        }
+      }
+
+      text += "\nS = Shop\nN = Name ändern\nR = Neustart";
+
+      leaderboardEl.textContent = text;
+    }
+
+    function changeName() {
+      const name = prompt("Gib einen Spielernamen ein:", state.playerName);
+
+      if (name && name.trim() !== "") {
+        state.playerName = name.trim().slice(0, 14);
+        localStorage.setItem("playerName", state.playerName);
+        updateLeaderboard();
+      }
+    }
+
+    function restartGame() {
+      state.level = 1;
+      state.lives = 5;
+      state.hits = 0;
+      state.requiredHits = 10;
+      state.timeLeft = config.levelTime;
+      state.score = 0;
+      state.finished = false;
+      state.messageTimer = 0;
+
+      scoreSaved = false;
+      lastRank = null;
+      spawnTimer = 0;
+
+      bullets.length = 0;
+      targets.length = 0;
+      explosions.length = 0;
+
+      msgEl.style.display = "none";
+      resultScreenEl.style.display = "none";
+      shopEl.style.display = "none";
+      adminPanelEl.style.display = "none";
+
+      state.lastT = performance.now();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawBackground();
+      drawTargets();
+      drawBullets();
+      drawPlayer();
+      drawExplosions();
+
+      statusEl.textContent =
+        "Level " + state.level + "/" + state.maxLevel +
+        " | Treffer " + state.hits + "/" + state.requiredHits +
+        " | Leben " + state.lives +
+        " | Zeit " + Math.max(0, state.timeLeft).toFixed(1) + " s" +
+        " | Score " + state.score +
+        " | Münzen " + state.coins +
+        " | Trophäen " + state.trophies +
+        " | Waffe: " + getCurrentWeapon().name +
+        " | Shop: S";
+    }
+
+    function drawBackground() {
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, "#37b7ff");
+      gradient.addColorStop(1, "#0865d9");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+
+      for (let i = 0; i < 12; i++) {
+        const x = (i * 170 + performance.now() * 0.025) % (canvas.width + 200) - 100;
+        const y = 80 + (i % 4) * 90;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 28, 0, Math.PI * 2);
+        ctx.arc(x + 32, y + 8, 22, 0, Math.PI * 2);
+        ctx.arc(x - 32, y + 10, 20, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawPlayer() {
+      ctx.save();
+      ctx.translate(player.x, player.y);
+
+      if (gunLoaded) {
+        ctx.drawImage(
+          gunImg,
+          -player.drawW / 2,
+          -player.drawH / 2,
+          player.drawW,
+          player.drawH
+        );
+      } else {
+        drawFallbackGun();
+      }
+
+      ctx.restore();
+    }
+
+    function drawFallbackGun() {
+      ctx.fillStyle = "#ffcc00";
+      roundRect(ctx, -80, -28, 140, 45, 18);
+      ctx.fill();
+
+      ctx.fillStyle = "#ff3b5c";
+      roundRect(ctx, 40, -18, 70, 20, 10);
+      ctx.fill();
+
+      ctx.fillStyle = "#20d6ff";
+      roundRect(ctx, -45, 10, 38, 55, 12);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 16px Arial";
+      ctx.fillText("Wasser", -45, 0);
+    }
+
+    function drawBullets() {
+      for (const b of bullets) {
+        ctx.fillStyle = b.color || "rgba(120,230,255,0.85)";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
+
+    function drawTargets() {
+      for (const t of targets) {
+        ctx.fillStyle = t.color;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.r * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = t.color;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.r * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        ctx.beginPath();
+        ctx.arc(t.x - t.r * 0.25, t.y - t.r * 0.25, t.r * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawExplosions() {
+      for (const e of explosions) {
+        const p = e.time / 0.35;
+        const r = (1 - p) * 80;
+
+        ctx.fillStyle = "rgba(255,255,255," + p + ")";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = e.color;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, r * 1.2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function showMessage(text, seconds) {
+      msgEl.textContent = text;
+      msgEl.style.display = "flex";
+      state.messageTimer = seconds;
+    }
+
+    function randomColor() {
+      const colors = ["#ff3b5c", "#ffcc00", "#00e676", "#ff7b00", "#b84dff"];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function rand(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function loop(t) {
+      const dt = Math.min(0.033, (t - state.lastT) / 1000);
+      state.lastT = t;
+
+      update(dt);
+      draw();
+      updateLeaderboard();
+
+      requestAnimationFrame(loop);
+    }
+
+    updateLeaderboard();
+
+    showMessage(
+      "Wasserpistolen-Spiel\nKlick oder Leertaste zum Schießen\n10 Münzen pro Ziel\nS = Shop\nN = Name ändern\nR = Neustart",
+      3
+    );
+
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>const ADMIN_CODE = "Fcb";
