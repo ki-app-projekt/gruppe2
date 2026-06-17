@@ -1,9 +1,10 @@
+html
 <!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8" />
   <title>Wasserpistolen-Spiel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 
   <style>
     html, body {
@@ -12,22 +13,24 @@
       overflow: hidden;
       background: #0b6ff2;
       font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      touch-action: none;
     }
 
     canvas {
       display: block;
       width: 100vw;
       height: 100vh;
+      touch-action: none;
     }
 
     #ui {
       position: absolute;
       top: 8px;
-      left: 8px;
+      left: 55px;
       right: 8px;
       color: white;
-      font-size: 15px;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+      font-size: 14px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
       display: flex;
       justify-content: space-between;
       gap: 12px;
@@ -75,24 +78,24 @@
 
     #shop {
       background: rgba(0,0,0,0.55);
-      z-index: 10;
+      z-index: 20;
     }
 
     #resultScreen {
       background: rgba(0,0,0,0.68);
-      z-index: 20;
+      z-index: 30;
     }
 
     #adminPanel {
       background: rgba(0,0,0,0.72);
-      z-index: 40;
+      z-index: 50;
     }
 
     #shopBox,
     #resultBox,
     #adminBox {
       width: min(560px, 92vw);
-      max-height: 88vh;
+      max-height: 86vh;
       overflow-y: auto;
       border-radius: 18px;
       padding: 22px;
@@ -224,11 +227,86 @@
     #adminControls {
       display: none;
     }
+
+    #mobileControls {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 12px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      z-index: 15;
+      pointer-events: auto;
+      padding: 0 8px;
+      box-sizing: border-box;
+    }
+
+    .mobileBtn {
+      min-width: 70px;
+      padding: 13px 10px;
+      border-radius: 14px;
+      border: 2px solid rgba(255,255,255,0.9);
+      background: rgba(255, 204, 0, 0.95);
+      color: #222;
+      font-weight: 800;
+      font-size: 14px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      touch-action: manipulation;
+    }
+
+    #shootBtn {
+      background: #00e6ff;
+    }
+
+    #adminMobileBtn {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 60;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: 2px solid white;
+      background: rgba(17, 27, 68, 0.92);
+      color: #ffcc00;
+      font-size: 20px;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      touch-action: manipulation;
+    }
+
+    @media (max-width: 700px) {
+      #ui {
+        font-size: 11px;
+        left: 56px;
+      }
+
+      #leaderboard {
+        display: none;
+      }
+
+      #status {
+        max-width: 100%;
+      }
+
+      #msg {
+        font-size: 22px;
+      }
+
+      .mobileBtn {
+        min-width: 62px;
+        font-size: 12px;
+        padding: 12px 8px;
+      }
+    }
   </style>
 </head>
 
 <body>
   <canvas id="game"></canvas>
+
+  <button id="adminMobileBtn">⚙</button>
 
   <div id="ui">
     <div id="status">Lädt...</div>
@@ -236,6 +314,13 @@
   </div>
 
   <div id="msg"></div>
+
+  <div id="mobileControls">
+    <button class="mobileBtn" id="shootBtn">Schießen</button>
+    <button class="mobileBtn" id="shopBtn">Shop</button>
+    <button class="mobileBtn" id="nameBtn">Name</button>
+    <button class="mobileBtn" id="restartBtn">Neustart</button>
+  </div>
 
   <div id="resultScreen">
     <div id="resultBox">
@@ -325,22 +410,13 @@
     const adminUnlockWeaponsBtn = document.getElementById("adminUnlockWeapons");
     const adminCloseBtn = document.getElementById("adminClose");
 
+    const shootBtn = document.getElementById("shootBtn");
+    const shopBtn = document.getElementById("shopBtn");
+    const nameBtn = document.getElementById("nameBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const adminMobileBtn = document.getElementById("adminMobileBtn");
+
     const ADMIN_CODE = "Fcb";
-
-    const GUN_URL = "https://images.thalia.media/-/BF750-750/c68cb37026b94d3c9f60ed3bc370277b/splash-fun-wasserpistole-21-cm-elektrisch.jpeg";
-
-    const gunImg = new Image();
-    let gunLoaded = false;
-
-    gunImg.onload = () => {
-      gunLoaded = true;
-    };
-
-    gunImg.onerror = () => {
-      gunLoaded = false;
-    };
-
-    gunImg.src = GUN_URL;
 
     const weapons = [
       {
@@ -350,7 +426,8 @@
         bulletRadius: 22,
         bulletSpeed: 760,
         cooldown: 0.16,
-        color: "rgba(120,230,255,0.85)"
+        color: "rgba(120,230,255,0.85)",
+        image: "bilder/pistole1.png"
       },
       {
         id: "pistol1",
@@ -359,7 +436,8 @@
         bulletRadius: 18,
         bulletSpeed: 950,
         cooldown: 0.11,
-        color: "rgba(0,255,180,0.9)"
+        color: "rgba(0,255,180,0.9)",
+        image: "bilder/pistole1.png"
       },
       {
         id: "pistol2",
@@ -368,7 +446,8 @@
         bulletRadius: 30,
         bulletSpeed: 820,
         cooldown: 0.17,
-        color: "rgba(80,200,255,0.95)"
+        color: "rgba(80,200,255,0.95)",
+        image: "bilder/pistole2.png"
       },
       {
         id: "pistol3",
@@ -377,7 +456,8 @@
         bulletRadius: 16,
         bulletSpeed: 1200,
         cooldown: 0.09,
-        color: "rgba(80,150,255,0.95)"
+        color: "rgba(80,150,255,0.95)",
+        image: "bilder/pistole3.png"
       },
       {
         id: "pistol4",
@@ -386,7 +466,8 @@
         bulletRadius: 25,
         bulletSpeed: 1050,
         cooldown: 0.10,
-        color: "rgba(255,215,0,0.95)"
+        color: "rgba(255,215,0,0.95)",
+        image: "bilder/pistole4.png"
       },
       {
         id: "pistol5",
@@ -395,7 +476,8 @@
         bulletRadius: 28,
         bulletSpeed: 1000,
         cooldown: 0.08,
-        color: "rgba(255,80,255,0.95)"
+        color: "rgba(255,80,255,0.95)",
+        image: "bilder/pistole1.png"
       },
       {
         id: "pistol6",
@@ -404,7 +486,8 @@
         bulletRadius: 24,
         bulletSpeed: 1150,
         cooldown: 0.085,
-        color: "rgba(180,240,255,0.95)"
+        color: "rgba(180,240,255,0.95)",
+        image: "bilder/pistole2.png"
       },
       {
         id: "pistol7",
@@ -413,7 +496,8 @@
         bulletRadius: 32,
         bulletSpeed: 980,
         cooldown: 0.095,
-        color: "rgba(255,120,40,0.95)"
+        color: "rgba(255,120,40,0.95)",
+        image: "bilder/pistole3.png"
       },
       {
         id: "pistol8",
@@ -422,7 +506,8 @@
         bulletRadius: 30,
         bulletSpeed: 1250,
         cooldown: 0.075,
-        color: "rgba(255,90,255,0.98)"
+        color: "rgba(255,90,255,0.98)",
+        image: "bilder/pistole4.png"
       },
       {
         id: "pistol9",
@@ -431,7 +516,8 @@
         bulletRadius: 40,
         bulletSpeed: 900,
         cooldown: 0.14,
-        color: "rgba(255,255,255,0.95)"
+        color: "rgba(255,255,255,0.95)",
+        image: "bilder/pistole1.png"
       },
       {
         id: "pistol10",
@@ -440,9 +526,20 @@
         bulletRadius: 36,
         bulletSpeed: 1400,
         cooldown: 0.06,
-        color: "rgba(0,255,255,0.98)"
+        color: "rgba(0,255,255,0.98)",
+        image: "bilder/pistole4.png"
       }
     ];
+
+    const weaponImages = {};
+
+    for (const weapon of weapons) {
+      if (weapon.image) {
+        const img = new Image();
+        img.src = weapon.image;
+        weaponImages[weapon.id] = img;
+      }
+    }
 
     function loadOwnedWeapons() {
       try {
@@ -519,10 +616,10 @@
       canvas.width = innerWidth;
       canvas.height = innerHeight;
 
-      player.y = canvas.height - 75;
+      player.y = canvas.height - 95;
       player.x = clamp(player.x || canvas.width / 2, 45, canvas.width - 45);
 
-      const base = Math.max(150, Math.min(240, canvas.width * 0.18));
+      const base = Math.max(130, Math.min(230, canvas.width * 0.25));
       player.drawW = base;
       player.drawH = base * 0.52;
     }
@@ -532,14 +629,17 @@
 
     addEventListener("pointermove", (e) => {
       if (state.finished) return;
+      if (shopEl.style.display === "flex") return;
+      if (resultScreenEl.style.display === "flex") return;
+      if (adminPanelEl.style.display === "flex") return;
 
       const rect = canvas.getBoundingClientRect();
       const px = (e.clientX - rect.left) * (canvas.width / rect.width);
-
       player.x = clamp(px, 45, canvas.width - 45);
     }, { passive: true });
 
-    addEventListener("pointerdown", () => {
+    addEventListener("pointerdown", (e) => {
+      if (e.target.tagName === "BUTTON") return;
       if (shopEl.style.display === "flex") return;
       if (resultScreenEl.style.display === "flex") return;
       if (adminPanelEl.style.display === "flex") return;
@@ -588,6 +688,12 @@
         player.right = false;
       }
     });
+
+    shootBtn.onclick = shoot;
+    shopBtn.onclick = toggleShop;
+    nameBtn.onclick = changeName;
+    restartBtn.onclick = restartGame;
+    adminMobileBtn.onclick = openAdminPanel;
 
     let audioCtx = null;
 
@@ -945,7 +1051,6 @@
             state.hits++;
             state.score += 10 * state.level;
 
-            // 10 Münzen pro abgeschossenes Ziel
             state.coins += config.coinsPerTarget;
             localStorage.setItem("coins", String(state.coins));
 
@@ -1020,7 +1125,7 @@
         "\nDu bist auf Platz " + rank +
         "\nMünzen: " + state.coins +
         "\nTrophäen: " + state.trophies +
-        "\n\nR = Neustart\nS = Shop",
+        "\n\nNeustart-Button drücken",
         999
       );
     }
@@ -1117,8 +1222,6 @@
         }
       }
 
-      text += "\nS = Shop\nN = Name ändern\nR = Neustart";
-
       leaderboardEl.textContent = text;
     }
 
@@ -1174,9 +1277,7 @@
         " | Zeit " + Math.max(0, state.timeLeft).toFixed(1) + " s" +
         " | Score " + state.score +
         " | Münzen " + state.coins +
-        " | Trophäen " + state.trophies +
-        " | Waffe: " + getCurrentWeapon().name +
-        " | Shop: S";
+        " | Waffe: " + getCurrentWeapon().name;
     }
 
     function drawBackground() {
@@ -1205,9 +1306,12 @@
       ctx.save();
       ctx.translate(player.x, player.y);
 
-      if (gunLoaded) {
+      const weapon = getCurrentWeapon();
+      const img = weaponImages[weapon.id];
+
+      if (img && img.complete && img.naturalWidth > 0) {
         ctx.drawImage(
-          gunImg,
+          img,
           -player.drawW / 2,
           -player.drawH / 2,
           player.drawW,
@@ -1266,11 +1370,6 @@
         ctx.fillStyle = t.color;
         ctx.beginPath();
         ctx.arc(t.x, t.y, t.r * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.beginPath();
-        ctx.arc(t.x - t.r * 0.25, t.y - t.r * 0.25, t.r * 0.18, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1340,7 +1439,7 @@
     updateLeaderboard();
 
     showMessage(
-      "Wasserpistolen-Spiel\nKlick oder Leertaste zum Schießen\n10 Münzen pro Ziel\nS = Shop\nN = Name ändern\nR = Neustart",
+      "Wasserpistolen-Spiel\nHandy: Finger bewegen + Schießen-Button\n10 Münzen pro Ziel\n50 Münzen pro Level",
       3
     );
 
@@ -1348,4 +1447,4 @@
   })();
   </script>
 </body>
-</html>const ADMIN_CODE = "Fcb";
+</html>
