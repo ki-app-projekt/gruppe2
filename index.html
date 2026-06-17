@@ -1,4 +1,3 @@
-html
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -418,6 +417,12 @@ html
 
     const ADMIN_CODE = "Fcb";
 
+    // ---- Online-Rangliste (jsonbin.io) ----
+    const BIN_ID = "6a330b3af5f4af5e29048bdf";
+    const ACCESS_KEY = "$2a$10$6p/Jg.50A26s6qA4bM8Ia.ypxQ9I64QlrlzbnSCgOvzPd51.eDWd.";
+    const BIN_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
+    let leaderboardData = [];
+
     const weapons = [
       {
         id: "basic",
@@ -531,15 +536,21 @@ html
       }
     ];
 
-    const weaponImages = {};
-
-    for (const weapon of weapons) {
-      if (weapon.image) {
-        const img = new Image();
-        img.src = weapon.image;
-        weaponImages[weapon.id] = img;
-      }
-    }
+    // Designs für die gezeichneten Wasserpistolen (alle zeigen nach oben).
+    // Passend zu den Shop-Namen: Farbe + Spezialeffekt an der Mündung.
+    const weaponThemes = {
+      basic:    { body: "#2bb6e6", accent: "#eaf9ff", tank: "#9be7ff", style: "normal" },
+      pistol1:  { body: "#13c46a", accent: "#d6ffe9", tank: "#0e9e54", style: "turbo" },
+      pistol2:  { body: "#2a7de1", accent: "#d7e9ff", tank: "#1b5bb0", style: "mega" },
+      pistol3:  { body: "#2f6bff", accent: "#cdd9ff", tank: "#1740c0", style: "blitz" },
+      pistol4:  { body: "#f4c430", accent: "#fff6c2", tank: "#c99700", style: "gold" },
+      pistol5:  { body: "#e64bd6", accent: "#ffd9f7", tank: "#b21fa3", style: "double" },
+      pistol6:  { body: "#7fdcff", accent: "#ffffff", tank: "#39b8e6", style: "ice" },
+      pistol7:  { body: "#ff6a2b", accent: "#ffd9a8", tank: "#d6431a", style: "fire" },
+      pistol8:  { body: "#ff5ad6", accent: "#ffffff", tank: "#9b5bff", style: "rainbow" },
+      pistol9:  { body: "#e9eef5", accent: "#ffffff", tank: "#b7c2d0", style: "power" },
+      pistol10: { body: "#19f0ff", accent: "#eaffff", tank: "#0bb6cf", style: "ultra" }
+    };
 
     function loadOwnedWeapons() {
       try {
@@ -932,7 +943,7 @@ html
 
       bullets.push({
         x: player.x,
-        y: player.y - 45,
+        y: player.y - (player.muzzleOffset || 45),
         r: weapon.bulletRadius,
         vy: -weapon.bulletSpeed,
         color: weapon.color
@@ -1118,32 +1129,35 @@ html
 
     function winGame() {
       state.finished = true;
-      const rank = saveScore();
 
-      showMessage(
-        "Gewonnen!\nScore: " + state.score +
-        "\nDu bist auf Platz " + rank +
-        "\nMünzen: " + state.coins +
-        "\nTrophäen: " + state.trophies +
-        "\n\nNeustart-Button drücken",
-        999
-      );
+      showMessage("Gewonnen!\nSpeichere Rangliste ...", 999);
+
+      saveScore().then(rank => {
+        showMessage(
+          "Gewonnen!\nScore: " + state.score +
+          "\nDu bist auf Platz " + rank +
+          "\nMünzen: " + state.coins +
+          "\nTrophäen: " + state.trophies +
+          "\n\nNeustart-Button drücken",
+          999
+        );
+      });
     }
 
     function gameOver() {
       state.finished = true;
 
-      const rank = saveScore();
-
-      openResultScreen(rank);
+      saveScore().then(rank => openResultScreen(rank));
     }
 
-    function saveScore() {
+    async function saveScore() {
       if (scoreSaved) return lastRank;
 
       scoreSaved = true;
 
-      const list = getLeaderboard();
+      // Aktuelle Online-Rangliste holen, damit der Platz auch im Vergleich
+      // zu anderen Spielern stimmt.
+      await fetchLeaderboard();
 
       const entry = {
         id: Date.now() + "_" + Math.random(),
@@ -1154,15 +1168,14 @@ html
         trophies: state.trophies
       };
 
-      list.push(entry);
+      leaderboardData.push(entry);
+      leaderboardData.sort((a, b) => b.score - a.score);
 
-      list.sort((a, b) => b.score - a.score);
+      lastRank = leaderboardData.findIndex(item => item.id === entry.id) + 1;
 
-      lastRank = list.findIndex(item => item.id === entry.id) + 1;
+      leaderboardData = leaderboardData.slice(0, 10);
 
-      const top10 = list.slice(0, 10);
-
-      localStorage.setItem("leaderboard", JSON.stringify(top10));
+      await putLeaderboard();
       updateLeaderboard();
 
       return lastRank;
@@ -1197,10 +1210,48 @@ html
     }
 
     function getLeaderboard() {
+      return leaderboardData;
+    }
+
+    async function fetchLeaderboard() {
       try {
-        return JSON.parse(localStorage.getItem("leaderboard")) || [];
-      } catch {
-        return [];
+        const res = await fetch(BIN_URL + "/latest", {
+          headers: { "X-Access-Key": ACCESS_KEY }
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const data = await res.json();
+        const rec = data.record;
+
+        if (Array.isArray(rec)) {
+          leaderboardData = rec;
+        } else if (rec && Array.isArray(rec.leaderboard)) {
+          leaderboardData = rec.leaderboard;
+        } else {
+          leaderboardData = [];
+        }
+      } catch (e) {
+        console.warn("Rangliste konnte nicht geladen werden:", e);
+      }
+
+      leaderboardData.sort((a, b) => b.score - a.score);
+      return leaderboardData;
+    }
+
+    async function putLeaderboard() {
+      try {
+        const res = await fetch(BIN_URL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Access-Key": ACCESS_KEY,
+            "X-Bin-Versioning": "false"
+          },
+          body: JSON.stringify(leaderboardData)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+      } catch (e) {
+        console.warn("Rangliste konnte nicht gespeichert werden:", e);
       }
     }
 
@@ -1303,43 +1354,153 @@ html
     }
 
     function drawPlayer() {
+      const weapon = getCurrentWeapon();
+      const theme = weaponThemes[weapon.id] || weaponThemes.basic;
+
+      // Größe der Pistole – hoch statt breit, damit sie nach oben zeigt.
+      const gw = clamp(canvas.width * 0.10, 58, 104);
+      const gh = gw * 1.75;
+
+      // Wasser kommt aus der Mündung (oben).
+      player.muzzleOffset = gh;
+
       ctx.save();
       ctx.translate(player.x, player.y);
-
-      const weapon = getCurrentWeapon();
-      const img = weaponImages[weapon.id];
-
-      if (img && img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(
-          img,
-          -player.drawW / 2,
-          -player.drawH / 2,
-          player.drawW,
-          player.drawH
-        );
-      } else {
-        drawFallbackGun();
-      }
-
+      drawWaterGun(theme, gw, gh);
       ctx.restore();
     }
 
-    function drawFallbackGun() {
-      ctx.fillStyle = "#ffcc00";
-      roundRect(ctx, -80, -28, 140, 45, 18);
+    // Zeichnet eine senkrechte, nach oben zeigende Wasserpistole.
+    // Ursprung (0,0) liegt unten an der Pistole; nach oben = negatives y.
+    function drawWaterGun(theme, gw, gh) {
+      const style = theme.style;
+
+      if (style === "ultra") {
+        ctx.shadowColor = theme.body;
+        ctx.shadowBlur = 22;
+      }
+
+      const wide = style === "power" ? 1.18 : 1;
+      const bw = gw * wide;
+      const barrelW = gw * 0.34 * (style === "power" ? 1.25 : 1);
+
+      // Lauf / Läufe
+      ctx.fillStyle = theme.accent;
+      if (style === "double") {
+        roundRect(ctx, -barrelW * 0.95, -gh, barrelW * 0.7, gh * 0.5, barrelW * 0.3);
+        ctx.fill();
+        roundRect(ctx, barrelW * 0.25, -gh, barrelW * 0.7, gh * 0.5, barrelW * 0.3);
+        ctx.fill();
+      } else {
+        roundRect(ctx, -barrelW / 2, -gh, barrelW, gh * 0.5, barrelW * 0.4);
+        ctx.fill();
+      }
+
+      // Mündungsring
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      roundRect(ctx, -barrelW / 2 - 2, -gh, barrelW + 4, gh * 0.05, 4);
       ctx.fill();
 
-      ctx.fillStyle = "#ff3b5c";
-      roundRect(ctx, 40, -18, 70, 20, 10);
+      // Körper / Tank
+      if (style === "rainbow") {
+        const g = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0);
+        g.addColorStop(0, "#ff3b3b");
+        g.addColorStop(0.2, "#ff9e00");
+        g.addColorStop(0.4, "#ffe600");
+        g.addColorStop(0.6, "#27d36b");
+        g.addColorStop(0.8, "#2f7bff");
+        g.addColorStop(1, "#a64bff");
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = theme.body;
+      }
+      roundRect(ctx, -bw / 2, -gh * 0.62, bw, gh * 0.5, gw * 0.22);
       ctx.fill();
 
-      ctx.fillStyle = "#20d6ff";
-      roundRect(ctx, -45, 10, 38, 55, 12);
+      // Tank-Fenster
+      const tankR = gw * (style === "mega" ? 0.2 : 0.16);
+      ctx.fillStyle = theme.tank;
+      ctx.beginPath();
+      ctx.arc(-bw * 0.12, -gh * 0.4, tankR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath();
+      ctx.arc(-bw * 0.16, -gh * 0.44, tankR * 0.4, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 16px Arial";
-      ctx.fillText("Wasser", -45, 0);
+      ctx.shadowBlur = 0;
+
+      // Griff
+      ctx.fillStyle = theme.body;
+      ctx.save();
+      ctx.translate(gw * 0.1, -gh * 0.16);
+      ctx.rotate(0.3);
+      roundRect(ctx, -gw * 0.13, 0, gw * 0.26, gh * 0.34, gw * 0.1);
+      ctx.fill();
+      ctx.restore();
+
+      // Abzugsbügel
+      ctx.strokeStyle = theme.body;
+      ctx.lineWidth = gw * 0.05;
+      ctx.beginPath();
+      ctx.arc(0, -gh * 0.1, gw * 0.12, 0.15, Math.PI * 0.9);
+      ctx.stroke();
+
+      // Effekte an der Mündung passend zum Namen
+      const topY = -gh;
+      if (style === "fire") {
+        drawFlames(0, topY, gw);
+      } else if (style === "ice") {
+        drawIce(0, topY, gw);
+      } else if (style === "gold") {
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        roundRect(ctx, -bw * 0.36, -gh * 0.58, bw * 0.12, gh * 0.4, gw * 0.05);
+        ctx.fill();
+      } else if (style === "blitz") {
+        ctx.fillStyle = "#fff7a8";
+        ctx.beginPath();
+        ctx.moveTo(bw * 0.12, -gh * 0.5);
+        ctx.lineTo(bw * 0.0, -gh * 0.34);
+        ctx.lineTo(bw * 0.1, -gh * 0.34);
+        ctx.lineTo(-bw * 0.04, -gh * 0.16);
+        ctx.lineTo(bw * 0.16, -gh * 0.38);
+        ctx.lineTo(bw * 0.06, -gh * 0.38);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawFlames(cx, topY, gw) {
+      const cols = ["#ffd200", "#ff7b00", "#ff2d00"];
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = cols[i];
+        const w = gw * (0.26 - i * 0.06);
+        const h = gw * (0.55 - i * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(cx - w, topY);
+        ctx.quadraticCurveTo(cx - w * 0.2, topY - h * 0.6, cx, topY - h);
+        ctx.quadraticCurveTo(cx + w * 0.2, topY - h * 0.6, cx + w, topY);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawIce(cx, topY, gw) {
+      ctx.fillStyle = "#bff0ff";
+      for (let i = -1; i <= 1; i++) {
+        const x = cx + i * gw * 0.18;
+        const h = gw * (i === 0 ? 0.45 : 0.28);
+        ctx.beginPath();
+        ctx.moveTo(x, topY - h);
+        ctx.lineTo(x - gw * 0.08, topY);
+        ctx.lineTo(x + gw * 0.08, topY);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.arc(cx, topY - gw * 0.2, gw * 0.05, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     function drawBullets() {
@@ -1437,6 +1598,9 @@ html
     }
 
     updateLeaderboard();
+
+    // Rangliste vom Server laden.
+    fetchLeaderboard().then(updateLeaderboard);
 
     showMessage(
       "Wasserpistolen-Spiel\nHandy: Finger bewegen + Schießen-Button\n10 Münzen pro Ziel\n50 Münzen pro Level",
